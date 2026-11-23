@@ -55,6 +55,14 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           save-if: ${{ github.event_name == 'push' }}
+      # A plugin with DuckDB inside (libduckdb-sys's bundled build) unpacks its sources under
+      # target/duckdb-sources, keyed by the archive and marked complete with a `.complete` file.
+      # A restored cache can hold such a tree without its marker, and the build script then
+      # fails with "Directory not empty" (SDB-331, seen when libduckdb-sys's features changed):
+      # the tree is never taken from the cache, and is not saved into it either (the last step).
+      - name: Drop DuckDB's unpacked sources from the restored cache
+        shell: bash
+        run: rm -rf target/duckdb-sources target/*/duckdb-sources
       - run: cargo fmt --all --check
       - run: cargo clippy --all-targets --locked -- -D warnings
       - name: The tests' variables
@@ -70,6 +78,11 @@ jobs:
       - name: The plugin's other tests
         run: |
           if [ -x ci/more-tests.sh ]; then ci/more-tests.sh; else echo "no ci/more-tests.sh: nothing more to run"; fi
+      # Before the cache is saved (its post step): DuckDB's unpacked sources are not kept.
+      - name: Keep DuckDB's unpacked sources out of the saved cache
+        if: always()
+        shell: bash
+        run: rm -rf target/duckdb-sources target/*/duckdb-sources
 
   windows:
     name: Windows · clippy and tests
@@ -85,8 +98,21 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           save-if: ${{ github.event_name == 'push' }}
+      # A plugin with DuckDB inside (libduckdb-sys's bundled build) unpacks its sources under
+      # target/duckdb-sources, keyed by the archive and marked complete with a `.complete` file.
+      # A restored cache can hold such a tree without its marker, and the build script then
+      # fails with "Directory not empty" (SDB-331, seen when libduckdb-sys's features changed):
+      # the tree is never taken from the cache, and is not saved into it either (the last step).
+      - name: Drop DuckDB's unpacked sources from the restored cache
+        shell: bash
+        run: rm -rf target/duckdb-sources target/*/duckdb-sources
       - run: cargo clippy --all-targets --locked -- -D warnings
       - run: cargo test --locked
+      # Before the cache is saved (its post step): DuckDB's unpacked sources are not kept.
+      - name: Keep DuckDB's unpacked sources out of the saved cache
+        if: always()
+        shell: bash
+        run: rm -rf target/duckdb-sources target/*/duckdb-sources
 
   deny:
     name: Licenses and vulnerabilities
